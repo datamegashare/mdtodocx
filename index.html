@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MDtoDOCX v1.2</title>
+<title>MDtoDOCX v1.3</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
 
@@ -289,7 +289,7 @@ main {
 
 <header id="app-header">
   <span class="hdr-logo">MDtoDOCX</span>
-  <span class="hdr-version">index_mdtodocx_v1.2.html</span>
+  <span class="hdr-version">index_mdtodocx_v1.3.html</span>
   <div class="hdr-sep"></div>
   <button class="btn-instalar-pwa" id="btn-install">⬇ Instalar</button>
 </header>
@@ -368,6 +368,13 @@ const selFont     = document.getElementById('sel-font');
 const selSize     = document.getElementById('sel-size');
 
 // ── HELPERS ─────────────────────────────────────────
+function decodeHtmlEntities(str) {
+  if (!str) return str;
+  const txt = document.createElement('textarea');
+  txt.innerHTML = str;
+  return txt.value;
+}
+
 function setStatus(msg, type = '') {
   statusMsg.textContent = msg;
   statusMsg.className   = type;
@@ -521,7 +528,7 @@ function tokToDocx(tok, font, halfPt) {
     }
 
     case 'code': {
-      return tok.text.split('\n').map((line, i, arr) =>
+      return decodeHtmlEntities(tok.text).split('\n').map((line, i, arr) =>
         new docx.Paragraph({
           children: [new docx.TextRun({ text: line || ' ', font: 'Courier New', size: Math.max(halfPt - 4, 16) })],
           indent  : { left: 360 },
@@ -537,7 +544,7 @@ function tokToDocx(tok, font, halfPt) {
         tableHeader: true,
         children: tok.header.map(cell => new docx.TableCell({
           children: [new docx.Paragraph({
-            children: [new docx.TextRun({ text: cell.text, bold: true, font, size: halfPt })]
+            children: [new docx.TextRun({ text: decodeHtmlEntities(cell.text), bold: true, font, size: halfPt })]
           })],
           shading: { fill: 'f1f5f9' },
         }))
@@ -583,31 +590,31 @@ function inlineRuns(tokens, font, size) {
     switch (t.type) {
       case 'text':
       case 'escape':
-        runs.push(new docx.TextRun({ text: t.text || t.raw || '', font, size }));
+        runs.push(new docx.TextRun({ text: decodeHtmlEntities(t.text || t.raw || ''), font, size }));
         break;
       case 'strong':
         (t.tokens || []).forEach(s =>
-          runs.push(new docx.TextRun({ text: s.text || s.raw || '', bold: true, font, size }))
+          runs.push(new docx.TextRun({ text: decodeHtmlEntities(s.text || s.raw || ''), bold: true, font, size }))
         );
         break;
       case 'em':
         (t.tokens || []).forEach(s =>
-          runs.push(new docx.TextRun({ text: s.text || s.raw || '', italics: true, font, size }))
+          runs.push(new docx.TextRun({ text: decodeHtmlEntities(s.text || s.raw || ''), italics: true, font, size }))
         );
         break;
       case 'del':
         (t.tokens || []).forEach(s =>
-          runs.push(new docx.TextRun({ text: s.text || s.raw || '', strike: true, font, size }))
+          runs.push(new docx.TextRun({ text: decodeHtmlEntities(s.text || s.raw || ''), strike: true, font, size }))
         );
         break;
       case 'codespan':
-        runs.push(new docx.TextRun({ text: t.text || '', font: 'Courier New', size: Math.max(size - 2, 16) }));
+        runs.push(new docx.TextRun({ text: decodeHtmlEntities(t.text || ''), font: 'Courier New', size: Math.max(size - 2, 16) }));
         break;
       case 'link':
-        runs.push(new docx.TextRun({ text: t.text || t.href || '', color: '1d4ed8', underline: {}, font, size }));
+        runs.push(new docx.TextRun({ text: decodeHtmlEntities(t.text || t.href || ''), color: '1d4ed8', underline: {}, font, size }));
         break;
       default:
-        if (t.raw) runs.push(new docx.TextRun({ text: t.raw, font, size }));
+        if (t.raw) runs.push(new docx.TextRun({ text: decodeHtmlEntities(t.raw), font, size }));
     }
   }
   return runs.length ? runs : [new docx.TextRun({ text: '', font, size })];
