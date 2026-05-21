@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MDtoDOCX v1.2</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+
+<!-- Stack exacto del ejemplo oficial dolanmiu/docx -->
+<script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+
+<style>
+/* ── TOKENS ─────────────────────────────────────── */
+:root {
+  --bg        : #f1f5f9;
+  --surface   : #ffffff;
+  --border    : #e2e8f0;
+  --accent    : #d97706;
+  --accent2   : #0f172a;
+  --text      : #1e293b;
+  --muted     : #64748b;
+  --success   : #16a34a;
+  --danger    : #dc2626;
+  --radius    : 12px;
+  --radius-sm : 8px;
+  --shadow    : 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md : 0 4px 12px rgba(0,0,0,.10);
+  --header-h  : 52px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background    : var(--bg);
+  color         : var(--text);
+  font-family   : 'DM Sans', sans-serif;
+  font-size     : 14px;
+  display       : flex;
+  flex-direction: column;
+  min-height    : 100vh;
+}
+button { font-family: inherit; cursor: pointer; }
+
+/* ── HEADER ─────────────────────────────────────── */
+#app-header {
+  height       : var(--header-h);
+  background   : var(--accent2);
+  display      : flex;
+  align-items  : center;
+  padding      : 0 20px;
+  gap          : 12px;
+  flex-shrink  : 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  position     : sticky;
+  top          : 0;
+  z-index      : 100;
+}
+.hdr-logo {
+  font-family   : 'Bebas Neue', sans-serif;
+  font-size     : 1.4rem;
+  color         : var(--accent);
+  letter-spacing: 2px;
+}
+.hdr-version {
+  font-size  : .68rem;
+  color      : rgba(255,255,255,.3);
+  margin-left: 4px;
+}
+.hdr-sep { flex: 1; }
+.btn-instalar-pwa {
+  display      : none;
+  background   : transparent;
+  border       : 1px solid rgba(217,119,6,.7);
+  color        : #d97706;
+  border-radius: var(--radius-sm);
+  padding      : 5px 12px;
+  font-size    : .72rem;
+  align-items  : center;
+  gap          : 5px;
+  transition   : all .15s;
+}
+.btn-instalar-pwa:hover { background: rgba(217,119,6,.15); color: #fbbf24; border-color: #fbbf24; }
+
+/* ── TOOLBAR ─────────────────────────────────────── */
+.toolbar {
+  background   : var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding      : 10px 20px;
+  display      : flex;
+  align-items  : center;
+  gap          : 16px;
+  flex-wrap    : wrap;
+}
+.toolbar-label {
+  font-size     : .67rem;
+  font-weight   : 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color         : var(--muted);
+}
+.ctrl-group { display: flex; align-items: center; gap: 8px; }
+.toolbar select {
+  font-family        : 'DM Sans', sans-serif;
+  font-size          : .8rem;
+  background         : var(--bg);
+  border             : 1px solid var(--border);
+  color              : var(--text);
+  padding            : 5px 28px 5px 10px;
+  border-radius      : var(--radius-sm);
+  outline            : none;
+  cursor             : pointer;
+  appearance         : none;
+  -webkit-appearance : none;
+  background-image   : url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat  : no-repeat;
+  background-position: right 9px center;
+  transition         : border-color .15s;
+}
+.toolbar select:hover,
+.toolbar select:focus { border-color: var(--accent); }
+.toolbar-sep { width: 1px; height: 20px; background: var(--border); }
+
+/* ── MAIN ────────────────────────────────────────── */
+main {
+  flex           : 1;
+  display        : flex;
+  align-items    : center;
+  justify-content: center;
+  padding        : 40px 20px;
+}
+.workspace {
+  width         : 100%;
+  max-width     : 560px;
+  display       : flex;
+  flex-direction: column;
+  gap           : 16px;
+}
+
+/* ── CARD ────────────────────────────────────────── */
+.card {
+  background   : var(--surface);
+  border       : 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow   : var(--shadow);
+  overflow     : hidden;
+}
+.card-header {
+  padding      : 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display      : flex;
+  align-items  : center;
+  gap          : 8px;
+}
+.card-title {
+  font-size     : .67rem;
+  font-weight   : 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color         : var(--muted);
+}
+
+/* ── DROP ZONE ───────────────────────────────────── */
+.drop-zone {
+  padding   : 48px 32px;
+  text-align: center;
+  cursor    : pointer;
+  transition: background .2s;
+}
+.drop-zone:hover,
+.drop-zone.drag-over { background: #fef9f0; }
+.drop-zone.has-file  { background: #f0fdf4; cursor: default; }
+
+.drop-icon    { font-size: 36px; margin-bottom: 12px; display: block; }
+.drop-title   { font-size: .95rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.drop-sub     { font-size: .78rem; color: var(--muted); margin-bottom: 16px; }
+
+.btn-select {
+  background   : var(--bg);
+  border       : 1px solid var(--border);
+  color        : var(--text);
+  border-radius: var(--radius-sm);
+  padding      : 7px 18px;
+  font-size    : .8rem;
+  font-weight  : 500;
+  transition   : all .15s;
+}
+.btn-select:hover { border-color: var(--accent); color: var(--accent); }
+
+.drop-hint-change {
+  display   : none;
+  font-size : .75rem;
+  color     : var(--muted);
+  margin-top: 12px;
+}
+.drop-zone.has-file .drop-hint-change { display: block; }
+.drop-zone.has-file .drop-action      { display: none; }
+
+.file-badge {
+  display      : none;
+  align-items  : center;
+  gap          : 8px;
+  background   : #dcfce7;
+  border       : 1px solid #bbf7d0;
+  border-radius: var(--radius-sm);
+  padding      : 8px 14px;
+  margin-top   : 14px;
+  font-size    : .8rem;
+  font-weight  : 500;
+  color        : #15803d;
+  word-break   : break-all;
+}
+.drop-zone.has-file .file-badge { display: inline-flex; }
+#file-input { display: none; }
+
+/* ── BTN CONVERTIR ───────────────────────────────── */
+.btn-convert {
+  width         : 100%;
+  background    : var(--accent);
+  color         : #fff;
+  border        : none;
+  border-radius : var(--radius);
+  padding       : 14px;
+  font-size     : .95rem;
+  font-weight   : 600;
+  letter-spacing: .02em;
+  transition    : background .15s, transform .1s;
+}
+.btn-convert:not(:disabled):hover  { background: #b45309; transform: translateY(-1px); }
+.btn-convert:not(:disabled):active { transform: translateY(0); }
+.btn-convert:disabled {
+  background: var(--bg);
+  color     : #cbd5e1;
+  border    : 1px solid var(--border);
+  cursor    : not-allowed;
+}
+
+/* ── STATUS BAR ──────────────────────────────────── */
+.status-bar {
+  background  : var(--surface);
+  border-top  : 1px solid var(--border);
+  padding     : 8px 20px;
+  display     : flex;
+  align-items : center;
+  gap         : 8px;
+  font-size   : .72rem;
+  color       : var(--muted);
+  min-height  : 36px;
+  flex-shrink : 0;
+}
+.status-dot {
+  width        : 6px;
+  height       : 6px;
+  border-radius: 50%;
+  background   : #cbd5e1;
+  flex-shrink  : 0;
+  transition   : background .3s;
+}
+.status-dot.ok   { background: var(--success); box-shadow: 0 0 5px var(--success); }
+.status-dot.err  { background: var(--danger);  box-shadow: 0 0 5px var(--danger); }
+.status-dot.busy { background: var(--accent); animation: pulse .8s ease infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+#status-msg.ok   { color: var(--success); }
+#status-msg.err  { color: var(--danger); }
+#status-msg.busy { color: var(--accent); }
+
+/* ── TOAST ───────────────────────────────────────── */
+.toast {
+  position      : fixed;
+  bottom        : 52px;
+  left          : 50%;
+  transform     : translateX(-50%) translateY(12px);
+  background    : var(--accent2);
+  color         : #fff;
+  font-size     : .78rem;
+  padding       : 8px 18px;
+  border-radius : var(--radius-sm);
+  opacity       : 0;
+  transition    : opacity .25s, transform .25s;
+  pointer-events: none;
+  z-index       : 999;
+  white-space   : nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header id="app-header">
+  <span class="hdr-logo">MDtoDOCX</span>
+  <span class="hdr-version">index_mdtodocx_v1.2.html</span>
+  <div class="hdr-sep"></div>
+  <button class="btn-instalar-pwa" id="btn-install">⬇ Instalar</button>
+</header>
+
+<div class="toolbar">
+  <span class="toolbar-label">Configuración DOCX</span>
+  <div class="ctrl-group">
+    <span class="toolbar-label">Fuente</span>
+    <select id="sel-font">
+      <option value="Calibri">Calibri</option>
+      <option value="Arial">Arial</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+    </select>
+  </div>
+  <div class="toolbar-sep"></div>
+  <div class="ctrl-group">
+    <span class="toolbar-label">Tamaño</span>
+    <select id="sel-size">
+      <option value="10">10 pt</option>
+      <option value="11" selected>11 pt</option>
+      <option value="12">12 pt</option>
+      <option value="14">14 pt</option>
+    </select>
+  </div>
+</div>
+
+<main>
+  <div class="workspace">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Archivo fuente</span>
+      </div>
+      <div class="drop-zone" id="drop-zone">
+        <span class="drop-icon">📄</span>
+        <div class="drop-action">
+          <div class="drop-title">Soltá tu archivo .md acá</div>
+          <div class="drop-sub">o usá el selector</div>
+          <button class="btn-select" id="btn-select">Seleccionar archivo</button>
+        </div>
+        <div class="file-badge" id="file-badge">
+          <span>✓</span>
+          <span id="file-name-label">—</span>
+        </div>
+        <div class="drop-hint-change">Hacé click para cambiar el archivo</div>
+        <input type="file" id="file-input" accept=".md,text/markdown,text/plain" />
+      </div>
+    </div>
+    <button class="btn-convert" id="btn-convert" disabled>Convertir y Descargar</button>
+  </div>
+</main>
+
+<div class="status-bar">
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-msg">Listo. Seleccioná un archivo .md para comenzar.</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── ESTADO ──────────────────────────────────────────
+let currentFile    = null;
+let deferredPrompt = null;
+
+// ── ELEMENTOS ───────────────────────────────────────
+const dropZone    = document.getElementById('drop-zone');
+const fileInput   = document.getElementById('file-input');
+const btnSelect   = document.getElementById('btn-select');
+const btnConvert  = document.getElementById('btn-convert');
+const btnInstall  = document.getElementById('btn-install');
+const fileNameLbl = document.getElementById('file-name-label');
+const statusDot   = document.getElementById('status-dot');
+const statusMsg   = document.getElementById('status-msg');
+const toastEl     = document.getElementById('toast');
+const selFont     = document.getElementById('sel-font');
+const selSize     = document.getElementById('sel-size');
+
+// ── HELPERS ─────────────────────────────────────────
+function setStatus(msg, type = '') {
+  statusMsg.textContent = msg;
+  statusMsg.className   = type;
+  statusDot.className   = 'status-dot' + (type ? ' ' + type : '');
+}
+function showToast(msg, ms = 3000) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), ms);
+}
+function fmtBytes(b) {
+  return b < 1024 ? b + ' B' : (b / 1024).toFixed(1) + ' KB';
+}
+
+// ── DROP / SELECT ────────────────────────────────────
+btnSelect.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.md')) {
+    setStatus('Solo se aceptan archivos .md', 'err');
+    showToast('⚠ Archivo no válido');
+    return;
+  }
+  currentFile = file;
+  fileNameLbl.textContent = file.name + '  (' + fmtBytes(file.size) + ')';
+  dropZone.classList.add('has-file');
+  btnConvert.disabled = false;
+  setStatus('Archivo listo: ' + file.name, 'ok');
+}
+
+// ── CONVERTIR ────────────────────────────────────────
+btnConvert.addEventListener('click', async () => {
+  if (!currentFile) return;
+  btnConvert.disabled = true;
+  setStatus('Procesando...', 'busy');
+  try {
+    const mdText = await readFile(currentFile);
+    const blob   = await buildDocx(mdText, currentFile.name);
+    const name   = buildName(currentFile.name);
+    saveAs(blob, name);
+    setStatus('Descargado: ' + name, 'ok');
+    showToast('✓ ' + name);
+  } catch(err) {
+    console.error(err);
+    setStatus('Error: ' + err.message, 'err');
+    showToast('⚠ Error al convertir');
+  } finally {
+    btnConvert.disabled = false;
+  }
+});
+
+function readFile(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = () => rej(new Error('No se pudo leer el archivo'));
+    r.readAsText(file, 'UTF-8');
+  });
+}
+
+function buildName(orig) {
+  const base = orig.replace(/\.md$/i, '');
+  const now  = new Date();
+  const p    = n => String(n).padStart(2,'0');
+  return `${base}_${now.getFullYear()}${p(now.getMonth()+1)}${p(now.getDate())}_${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}.docx`;
+}
+
+// ── BUILD DOCX ───────────────────────────────────────
+// Acceso directo al global 'docx' — igual que el ejemplo oficial
+async function buildDocx(mdText, fileName) {
+  const font   = selFont.value;
+  const halfPt = parseInt(selSize.value) * 2;  // docx usa half-points
+  // 1 cm ≈ 567 twips
+  const margin = 567;
+
+  const tokens   = marked.lexer(mdText);
+  const children = [];
+  for (const tok of tokens) {
+    children.push(...tokToDocx(tok, font, halfPt));
+  }
+
+  const fileLabel = fileName.replace(/\.md$/i, '');
+
+  const doc = new docx.Document({
+    sections: [{
+      properties: {
+        page: { margin: { top: margin, right: margin, bottom: margin, left: margin } }
+      },
+      footers: {
+        default: new docx.Footer({
+          children: [
+            new docx.Paragraph({
+              alignment: docx.AlignmentType.CENTER,
+              children: [
+                new docx.TextRun({ text: fileLabel + '   ', font, size: halfPt - 4, color: '888888' }),
+                new docx.TextRun({ children: [docx.PageNumber.CURRENT], font, size: halfPt - 4, color: '888888' }),
+                new docx.TextRun({ text: ' de ', font, size: halfPt - 4, color: '888888' }),
+                new docx.TextRun({ children: [docx.PageNumber.TOTAL_PAGES], font, size: halfPt - 4, color: '888888' }),
+              ]
+            })
+          ]
+        })
+      },
+      children,
+    }]
+  });
+
+  return docx.Packer.toBlob(doc);
+}
+
+// ── TOKEN → DOCX ─────────────────────────────────────
+function tokToDocx(tok, font, halfPt) {
+  switch (tok.type) {
+
+    case 'heading': {
+      const levels = {
+        1: docx.HeadingLevel.HEADING_1, 2: docx.HeadingLevel.HEADING_2,
+        3: docx.HeadingLevel.HEADING_3, 4: docx.HeadingLevel.HEADING_4,
+        5: docx.HeadingLevel.HEADING_5, 6: docx.HeadingLevel.HEADING_6,
+      };
+      return [new docx.Paragraph({
+        heading : levels[tok.depth] || docx.HeadingLevel.HEADING_1,
+        children: inlineRuns(tok.tokens || [], font, halfPt),
+      })];
+    }
+
+    case 'paragraph':
+      return [new docx.Paragraph({
+        children: inlineRuns(tok.tokens || [], font, halfPt),
+        spacing : { after: 120 },
+      })];
+
+    case 'list': {
+      return tok.items.map(item => {
+        const inline = item.tokens && item.tokens[0] && item.tokens[0].tokens
+          ? item.tokens[0].tokens : [];
+        return new docx.Paragraph({
+          bullet  : { level: 0 },
+          children: inlineRuns(inline, font, halfPt),
+          spacing : { after: 60 },
+        });
+      });
+    }
+
+    case 'code': {
+      return tok.text.split('\n').map((line, i, arr) =>
+        new docx.Paragraph({
+          children: [new docx.TextRun({ text: line || ' ', font: 'Courier New', size: Math.max(halfPt - 4, 16) })],
+          indent  : { left: 360 },
+          spacing : { before: i === 0 ? 80 : 0, after: i === arr.length - 1 ? 80 : 0 },
+          border  : { left: { color: 'cccccc', space: 8, style: docx.BorderStyle.SINGLE, size: 12 } },
+        })
+      );
+    }
+
+    case 'table': {
+      const rows = [];
+      rows.push(new docx.TableRow({
+        tableHeader: true,
+        children: tok.header.map(cell => new docx.TableCell({
+          children: [new docx.Paragraph({
+            children: [new docx.TextRun({ text: cell.text, bold: true, font, size: halfPt })]
+          })],
+          shading: { fill: 'f1f5f9' },
+        }))
+      }));
+      tok.rows.forEach(row => {
+        rows.push(new docx.TableRow({
+          children: row.map(cell => new docx.TableCell({
+            children: [new docx.Paragraph({ children: inlineRuns(cell.tokens || [], font, halfPt) })]
+          }))
+        }));
+      });
+      return [
+        new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows }),
+        new docx.Paragraph({ children: [], spacing: { after: 120 } })
+      ];
+    }
+
+    case 'hr':
+      return [new docx.Paragraph({
+        children: [],
+        border  : { bottom: { color: 'e2e8f0', space: 1, style: docx.BorderStyle.SINGLE, size: 6 } },
+        spacing : { before: 120, after: 120 },
+      })];
+
+    case 'blockquote': {
+      const inner = [];
+      for (const t of (tok.tokens || [])) inner.push(...tokToDocx(t, font, halfPt));
+      return inner;
+    }
+
+    case 'space':
+      return [new docx.Paragraph({ children: [], spacing: { after: 80 } })];
+
+    default:
+      return [];
+  }
+}
+
+// ── INLINE RUNS ──────────────────────────────────────
+function inlineRuns(tokens, font, size) {
+  const runs = [];
+  for (const t of tokens) {
+    switch (t.type) {
+      case 'text':
+      case 'escape':
+        runs.push(new docx.TextRun({ text: t.text || t.raw || '', font, size }));
+        break;
+      case 'strong':
+        (t.tokens || []).forEach(s =>
+          runs.push(new docx.TextRun({ text: s.text || s.raw || '', bold: true, font, size }))
+        );
+        break;
+      case 'em':
+        (t.tokens || []).forEach(s =>
+          runs.push(new docx.TextRun({ text: s.text || s.raw || '', italics: true, font, size }))
+        );
+        break;
+      case 'del':
+        (t.tokens || []).forEach(s =>
+          runs.push(new docx.TextRun({ text: s.text || s.raw || '', strike: true, font, size }))
+        );
+        break;
+      case 'codespan':
+        runs.push(new docx.TextRun({ text: t.text || '', font: 'Courier New', size: Math.max(size - 2, 16) }));
+        break;
+      case 'link':
+        runs.push(new docx.TextRun({ text: t.text || t.href || '', color: '1d4ed8', underline: {}, font, size }));
+        break;
+      default:
+        if (t.raw) runs.push(new docx.TextRun({ text: t.raw, font, size }));
+    }
+  }
+  return runs.length ? runs : [new docx.TextRun({ text: '', font, size })];
+}
+
+// ── PWA ──────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  btnInstall.style.display = 'flex';
+});
+btnInstall.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  btnInstall.style.display = 'none';
+  if (outcome === 'accepted') showToast('✓ App instalada');
+});
+window.addEventListener('appinstalled', () => {
+  btnInstall.style.display = 'none';
+  showToast('✓ MDtoDOCX instalada');
+});
+</script>
+</body>
+</html>
